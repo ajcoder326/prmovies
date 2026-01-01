@@ -163,15 +163,20 @@ function getSpeedoStreamExtraction(link) {
       return streams;
     }
 
-    // Fallback: return original link for WebView playback
-    console.log("Fallback to embed URL");
-    var embedUrl = link.replace(/\/([^\/]+)\.html$/, "/embed-$1.html");
+    // Fallback: use WebView automation for direct page
+    // SpeedoStream embeds are disabled, so we use direct page with button click
+    console.log("Fallback to WebView automation");
     return [{
       server: "SpeedoStream",
-      link: embedUrl,
+      link: link,
       type: "automate",
       quality: "HD",
-      automation: { steps: [{ action: "waitForElement", selector: "video", timeout: 15000 }] }
+      automation: {
+        steps: [
+          // Click "Proceed to video" button
+          { action: "clickElement", selector: "#btn_download, input[name='imhuman']" }
+        ]
+      }
     }];
 
   } catch (err) {
