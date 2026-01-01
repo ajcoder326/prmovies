@@ -264,7 +264,8 @@ function getMetaData(link, providerContext) {
 
     console.log("Direct links found:", directLinks.length);
 
-    // Build linkList structure
+    // Build linkList structure - must match app's expected format
+    // Each item needs: title, link (first link), directLinks (array of individual links)
     if (directLinks.length > 0) {
       // Group by quality if available
       var hdLinks = [];
@@ -288,7 +289,8 @@ function getMetaData(link, providerContext) {
       if (hdLinks.length > 0) {
         linkList.push({
           title: "HD Quality",
-          links: hdLinks
+          link: hdLinks[0].link,
+          directLinks: hdLinks
         });
       }
 
@@ -296,7 +298,8 @@ function getMetaData(link, providerContext) {
       if (sdLinks.length > 0) {
         linkList.push({
           title: "SD Quality",
-          links: sdLinks
+          link: sdLinks[0].link,
+          directLinks: sdLinks
         });
       }
 
@@ -304,7 +307,8 @@ function getMetaData(link, providerContext) {
       if (otherLinks.length > 0) {
         linkList.push({
           title: "Stream Links",
-          links: otherLinks
+          link: otherLinks[0].link,
+          directLinks: otherLinks
         });
       }
 
@@ -312,7 +316,8 @@ function getMetaData(link, providerContext) {
       if (linkList.length === 0) {
         linkList.push({
           title: "Available Streams",
-          links: directLinks
+          link: directLinks[0].link,
+          directLinks: directLinks
         });
       }
     }
