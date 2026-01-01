@@ -22,15 +22,21 @@ function getMetaData(link, providerContext) {
     // PRMovies PsyPlay theme uses specific selectors
     // Extract title from .mvic-desc h3 or og:title
     var title = "";
-    var titleEl = $(".mvic-desc h3[itemprop='name']").first();
+    
+    // Try simpler selector first
+    var titleEl = $(".mvic-desc h3").first();
     if (titleEl.length > 0) {
       title = titleEl.text().trim();
     }
-    // Fallback to og:title
+    // Fallback to og:title (meta tags are more reliable)
     if (!title) {
-      var ogTitle = $('meta[property="og:title"]').attr("content");
-      if (ogTitle) {
-        title = ogTitle.trim();
+      var metas = $("meta");
+      for (var m = 0; m < metas.length; m++) {
+        var meta = metas.eq(m);
+        if (meta.attr("property") === "og:title") {
+          title = meta.attr("content") || "";
+          break;
+        }
       }
     }
     // Last fallback to page title
@@ -41,6 +47,7 @@ function getMetaData(link, providerContext) {
     title = title.replace(/Download.*$/i, "").trim();
     title = title.replace(/Watch Online.*$/i, "").trim();
     title = title.replace(/Full Movie.*$/i, "").trim();
+    title = title.replace(/&amp;/g, "&");
     console.log("Title found:", title ? title.substring(0, 40) : "none");
 
     // Determine content type
@@ -50,39 +57,51 @@ function getMetaData(link, providerContext) {
       type = "series";
     }
 
-    // Extract poster image from .mvic-thumb or og:image
+    // Extract poster image from .mvic-thumb img or og:image
     var image = "";
-    var posterImg = $(".mvic-thumb img[itemprop='image']").first();
+    var posterImg = $(".mvic-thumb img").first();
     if (posterImg.length > 0) {
       image = posterImg.attr("src") || posterImg.attr("data-src") || "";
     }
     // Fallback to og:image
     if (!image) {
-      var ogImage = $('meta[property="og:image"]').attr("content");
-      if (ogImage) {
-        image = ogImage;
+      var metas2 = $("meta");
+      for (var m2 = 0; m2 < metas2.length; m2++) {
+        var meta2 = metas2.eq(m2);
+        if (meta2.attr("property") === "og:image") {
+          image = meta2.attr("content") || "";
+          break;
+        }
       }
     }
     console.log("Image found:", image ? image.substring(0, 50) : "none");
 
     // Extract synopsis/description from .f-desc or og:description
     var synopsis = "";
-    var synopsisEl = $(".mvic-desc .f-desc, .desc .f-desc, p.f-desc").first();
+    var synopsisEl = $("p.f-desc").first();
     if (synopsisEl.length > 0) {
       synopsis = synopsisEl.text().trim();
     }
     // Fallback - try og:description
     if (!synopsis || synopsis.length < 20) {
-      var ogDesc = $('meta[property="og:description"]').attr("content");
-      if (ogDesc) {
-        synopsis = ogDesc.trim();
+      var metas3 = $("meta");
+      for (var m3 = 0; m3 < metas3.length; m3++) {
+        var meta3 = metas3.eq(m3);
+        if (meta3.attr("property") === "og:description") {
+          synopsis = meta3.attr("content") || "";
+          break;
+        }
       }
     }
     // Fallback - try meta description
     if (!synopsis || synopsis.length < 20) {
-      var metaDesc = $('meta[name="description"]').attr("content");
-      if (metaDesc) {
-        synopsis = metaDesc.trim();
+      var metas4 = $("meta");
+      for (var m4 = 0; m4 < metas4.length; m4++) {
+        var meta4 = metas4.eq(m4);
+        if (meta4.attr("name") === "description") {
+          synopsis = meta4.attr("content") || "";
+          break;
+        }
       }
     }
     if (!synopsis || synopsis.length < 20) {
