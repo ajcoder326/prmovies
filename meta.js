@@ -19,13 +19,26 @@ function getMetaData(link, providerContext) {
 
     var $ = cheerio.load(response.data);
 
-    // Extract title from h1 or .sheader h1
+    // PRMovies PsyPlay theme uses specific selectors
+    // Extract title from .mvic-desc h3 or og:title
     var title = "";
-    var titleEl = $("h1.entry-title, .sheader h1, h1").first();
+    var titleEl = $(".mvic-desc h3[itemprop='name']").first();
     if (titleEl.length > 0) {
       title = titleEl.text().trim();
     }
+    // Fallback to og:title
+    if (!title) {
+      var ogTitle = $('meta[property="og:title"]').attr("content");
+      if (ogTitle) {
+        title = ogTitle.trim();
+      }
+    }
+    // Last fallback to page title
+    if (!title) {
+      title = $("title").text().trim().split(" - ")[0];
+    }
     // Clean up title
+    title = title.replace(/Download.*$/i, "").trim();
     title = title.replace(/Watch Online.*$/i, "").trim();
     title = title.replace(/Full Movie.*$/i, "").trim();
     console.log("Title found:", title ? title.substring(0, 40) : "none");
@@ -37,26 +50,33 @@ function getMetaData(link, providerContext) {
       type = "series";
     }
 
-    // Extract poster image
+    // Extract poster image from .mvic-thumb or og:image
     var image = "";
-    var posterImg = $(".poster img, .sheader img, .film-poster img, img.wp-post-image").first();
+    var posterImg = $(".mvic-thumb img[itemprop='image']").first();
     if (posterImg.length > 0) {
       image = posterImg.attr("src") || posterImg.attr("data-src") || "";
     }
-    // Fallback to any large image
+    // Fallback to og:image
     if (!image) {
-      var contentImg = $("article img, .content img").first();
-      if (contentImg.length > 0) {
-        image = contentImg.attr("src") || "";
+      var ogImage = $('meta[property="og:image"]').attr("content");
+      if (ogImage) {
+        image = ogImage;
       }
     }
     console.log("Image found:", image ? image.substring(0, 50) : "none");
 
-    // Extract synopsis/description
+    // Extract synopsis/description from .f-desc or og:description
     var synopsis = "";
-    var synopsisEl = $(".wp-content p, .description p, .contenido p, .story p").first();
+    var synopsisEl = $(".mvic-desc .f-desc, .desc .f-desc, p.f-desc").first();
     if (synopsisEl.length > 0) {
       synopsis = synopsisEl.text().trim();
+    }
+    // Fallback - try og:description
+    if (!synopsis || synopsis.length < 20) {
+      var ogDesc = $('meta[property="og:description"]').attr("content");
+      if (ogDesc) {
+        synopsis = ogDesc.trim();
+      }
     }
     // Fallback - try meta description
     if (!synopsis || synopsis.length < 20) {
@@ -136,9 +156,9 @@ function getMetaData(link, providerContext) {
     var linkList = [];
     var directLinks = [];
 
-    // PRMovies uses speedostream for streaming
-    // Look for links in the download table
-    var downloadLinks = $("table a[href], .dltable a[href], a[href*='speedostream']");
+    // PRMovies PsyPlay theme uses .lnk-lnk class for download links
+    // Also check #list-dl section and iframe sources
+    var downloadLinks = $("#list-dl a.lnk-lnk, .lnk-lnk, a[href*='speedostream']");
     console.log("Download links found:", downloadLinks.length);
 
     for (var s = 0; s < downloadLinks.length && s < 50; s++) {
@@ -164,20 +184,20 @@ function getMetaData(link, providerContext) {
           href.indexOf("doodstream") !== -1 ||
           href.indexOf("mixdrop") !== -1) {
         
-        // Try to extract quality from link text or parent row
+        // Try to extract quality from link text or sibling spans
         var quality = "";
         var qualityMatch = linkText.match(/(\d{3,4}p|HD|4K)/i);
         if (qualityMatch) {
           quality = qualityMatch[0].toUpperCase();
         }
         
-        // Check parent row for quality info
-        var parentRow = anchor.closest("tr");
-        if (parentRow.length > 0) {
-          var rowText = parentRow.text();
-          var rowQualityMatch = rowText.match(/(\d{3,4}p|HD|4K)/i);
-          if (rowQualityMatch && !quality) {
-            quality = rowQualityMatch[0].toUpperCase();
+        // Check sibling spans for quality info (PRMovies structure)
+        var qualitySpan = anchor.find(".lnk-dl").last();
+        if (qualitySpan.length > 0) {
+          var spanText = qualitySpan.text().trim();
+          var spanQualityMatch = spanText.match(/(\d{3,4}p|HD)/i);
+          if (spanQualityMatch && !quality) {
+            quality = spanQualityMatch[0].toUpperCase();
           }
         }
 
