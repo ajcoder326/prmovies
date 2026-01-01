@@ -135,12 +135,19 @@ function getSpeedoStreamExtraction(link) {
       console.log("Processing quality link:", qLink.quality, fullUrl);
 
       try {
-        // POST to quality page
+        // Step 3: GET the /d/ page first (load it)
+        speedoHeaders["Referer"] = link;
+        console.log("GET /d/ page first");
+        var getResp = axios.get(fullUrl, { headers: speedoHeaders });
+
+        // Step 4: POST to same page (submit "Download File" form)
+        speedoHeaders["Referer"] = fullUrl;
+        console.log("POST to /d/ page");
         var response2 = axios.post(fullUrl, "imhuman=", { headers: speedoHeaders });
         var html2 = response2.data;
         var $2 = cheerio.load(html2);
 
-        // Look for Direct Download Link
+        // Step 5: Look for Direct Download Link
         $2("a[href*='ydc1wes.me'], a[href*='.mp4'], a:contains('Direct Download')").each(function () {
           var dlHref = $2(this).attr("href") || "";
           if (dlHref && (dlHref.indexOf(".mp4") !== -1 || dlHref.indexOf("ydc1wes.me") !== -1)) {
@@ -151,10 +158,11 @@ function getSpeedoStreamExtraction(link) {
               quality: qLink.quality,
               headers: { "Referer": fullUrl }
             });
+            console.log("Direct link found:", dlHref.substring(0, 80));
           }
         });
       } catch (qErr) {
-        console.error("Quality page error:", qErr);
+        console.error("Quality page error:", qErr.message || qErr);
       }
     }
 
