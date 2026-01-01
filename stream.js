@@ -56,7 +56,8 @@ function getStreams(link, type) {
 
 /**
  * SpeedoStream extraction
- * SpeedoStream embeds video in a packed JS or direct source
+ * SpeedoStream embeds video URL in jwplayer.setup() JavaScript
+ * Uses HTTP extraction instead of DOM automation to avoid popup ads
  */
 function getSpeedoStreamExtraction(link) {
   console.log("Creating SpeedoStream extraction:", link);
@@ -64,32 +65,20 @@ function getSpeedoStreamExtraction(link) {
   return [{
     server: "SpeedoStream",
     link: link,
-    type: "automate",
-    automation: {
-      steps: [
-        // Step 1: Extract video source from player
-        {
-          action: "extractUrl",
-          selectors: [
-            "video source[src]",
-            "video[src]",
-            "source[src*='.m3u8']",
-            "source[src*='.mp4']"
-          ],
-          attribute: "src",
-          patterns: [".m3u8", ".mp4", "master.m3u8"]
-        },
-        // Step 2: Fallback - extract from script (packed JS)
-        {
-          action: "extractFromScript",
-          patterns: [
-            "file:\\s*[\"']([^\"']+\\.m3u8[^\"']*)[\"']",
-            "sources:\\s*\\[\\{[^}]*file:[\"']([^\"']+)[\"']",
-            "source:\\s*[\"']([^\"']+\\.mp4[^\"']*)[\"']",
-            "src:\\s*[\"']([^\"']+\\.m3u8[^\"']*)[\"']"
-          ]
-        }
-      ]
+    type: "http",
+    extraction: {
+      method: "GET",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Referer": "https://prmovies.delivery/"
+      },
+      patterns: [
+        "sources:\\s*\\[\\s*\\{\\s*file\\s*:\\s*[\"']([^\"']+\\.m3u8[^\"']*)",
+        "file\\s*:\\s*[\"']([^\"']+\\.m3u8[^\"']*)[\"']"
+      ],
+      videoHeaders: {
+        "Referer": "https://speedostream1.com/"
+      }
     }
   }];
 }
