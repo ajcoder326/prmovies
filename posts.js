@@ -35,69 +35,24 @@ function getPosts(filter, page, providerContext) {
     var $ = cheerio.load(response.data);
     var posts = [];
 
-    // PRMovies uses article.item or div.item with film-poster structure
-    // Also check for items-list structure
-    var items = $("article.item, div.item, .items article, .ml-item");
-    console.log("Found items:", items.length);
-
-    if (items.length === 0) {
-      // Fallback: try finding by image and link patterns
-      items = $("a[href*='Watch-online-full-movie']");
-      console.log("Fallback link items:", items.length);
-      
-      for (var k = 0; k < items.length && k < 30; k++) {
-        try {
-          var anchor = items.eq(k);
-          var href = anchor.attr("href") || "";
-          var img = anchor.find("img").first();
-          var titleText = anchor.text().trim();
-          
-          // Try to get title from various sources
-          var title = img.attr("alt") || img.attr("title") || titleText || "";
-          var image = img.attr("src") || img.attr("data-src") || img.attr("data-lazy-src") || "";
-          
-          // Clean up title - remove quality badges
-          title = title.replace(/HINDI|720p|1080p|HD|CAM/gi, "").trim();
-          
-          if (title && href && image && title.length > 2) {
-            // Avoid duplicate entries
-            var isDuplicate = false;
-            for (var d = 0; d < posts.length; d++) {
-              if (posts[d].link === href) {
-                isDuplicate = true;
-                break;
-              }
-            }
-            if (!isDuplicate) {
-              posts.push({
-                title: title,
-                link: href,
-                image: image
-              });
-            }
-          }
-        } catch (e) {
-          console.error("Error parsing fallback item:", e);
-        }
-      }
-      
-      console.log("Found", posts.length, "posts from fallback");
-      return posts;
-    }
+    // PRMovies uses div.ml-item for movie cards
+    var items = $("div.ml-item");
+    console.log("Found ml-item items:", items.length);
 
     for (var i = 0; i < items.length; i++) {
       try {
         var element = items.eq(i);
-        var link = element.find("a").first();
-        var img = element.find("img").first();
-        var titleEl = element.find("h2, h3, .title, .entry-title").first();
+        var link = element.find("a.ml-mask").first();
+        var img = element.find("img.mli-thumb").first();
+        var titleEl = element.find(".mli-info h2").first();
 
-        var title = titleEl.text() || img.attr("alt") || img.attr("title") || "";
+        var title = titleEl.text() || img.attr("alt") || "";
         var href = link.attr("href") || "";
-        var image = img.attr("src") || img.attr("data-src") || img.attr("data-lazy-src") || "";
+        // PRMovies uses data-original for lazy loading images
+        var image = img.attr("data-original") || img.attr("src") || img.attr("data-src") || "";
 
         // Clean up title
-        title = title.replace(/HINDI|720p|1080p|HD|CAM/gi, "").trim();
+        title = title.trim();
 
         if (title && href && image) {
           posts.push({
@@ -108,6 +63,35 @@ function getPosts(filter, page, providerContext) {
         }
       } catch (e) {
         console.error("Error parsing item:", e);
+      }
+    }
+
+    // Fallback: try article.item structure
+    if (posts.length === 0) {
+      var articleItems = $("article.item");
+      console.log("Fallback article items:", articleItems.length);
+      
+      for (var j = 0; j < articleItems.length; j++) {
+        try {
+          var el = articleItems.eq(j);
+          var lnk = el.find("a").first();
+          var img2 = el.find("img").first();
+          var ttl = el.find("h2, h3, .title").first();
+
+          var t = ttl.text() || img2.attr("alt") || "";
+          var h = lnk.attr("href") || "";
+          var im = img2.attr("data-original") || img2.attr("src") || "";
+
+          if (t && h && im) {
+            posts.push({
+              title: t.trim(),
+              link: h,
+              image: im
+            });
+          }
+        } catch (e) {
+          console.error("Error parsing article item:", e);
+        }
       }
     }
 
@@ -138,64 +122,22 @@ function getSearchPosts(query, page, providerContext) {
     var $ = cheerio.load(response.data);
     var posts = [];
 
-    // Search results structure
-    var items = $("article.item, div.item, .result-item, .search-item");
+    // Search results use same ml-item structure
+    var items = $("div.ml-item");
     console.log("Found search items:", items.length);
-
-    if (items.length === 0) {
-      // Fallback: find by link pattern
-      items = $("a[href*='Watch-online-full-movie']");
-      console.log("Fallback search items:", items.length);
-      
-      for (var k = 0; k < items.length && k < 30; k++) {
-        try {
-          var anchor = items.eq(k);
-          var href = anchor.attr("href") || "";
-          var img = anchor.find("img").first();
-          var titleText = anchor.text().trim();
-          
-          var title = img.attr("alt") || img.attr("title") || titleText || "";
-          var image = img.attr("src") || img.attr("data-src") || "";
-          
-          title = title.replace(/HINDI|720p|1080p|HD|CAM/gi, "").trim();
-          
-          if (title && href && image && title.length > 2) {
-            var isDuplicate = false;
-            for (var d = 0; d < posts.length; d++) {
-              if (posts[d].link === href) {
-                isDuplicate = true;
-                break;
-              }
-            }
-            if (!isDuplicate) {
-              posts.push({
-                title: title,
-                link: href,
-                image: image
-              });
-            }
-          }
-        } catch (e) {
-          console.error("Error parsing fallback search item:", e);
-        }
-      }
-      
-      console.log("Found", posts.length, "search results from fallback");
-      return posts;
-    }
 
     for (var i = 0; i < items.length; i++) {
       try {
         var element = items.eq(i);
-        var img = element.find("img").first();
-        var link = element.find("a").first();
-        var titleEl = element.find("h2, h3, .title, .entry-title").first();
+        var link = element.find("a.ml-mask").first();
+        var img = element.find("img.mli-thumb").first();
+        var titleEl = element.find(".mli-info h2").first();
 
-        var title = titleEl.text() || img.attr("alt") || img.attr("title") || "";
+        var title = titleEl.text() || img.attr("alt") || "";
         var href = link.attr("href") || "";
-        var image = img.attr("src") || img.attr("data-src") || "";
+        var image = img.attr("data-original") || img.attr("src") || "";
 
-        title = title.replace(/HINDI|720p|1080p|HD|CAM/gi, "").trim();
+        title = title.trim();
 
         if (title && href && image) {
           posts.push({
