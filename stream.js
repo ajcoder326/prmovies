@@ -66,20 +66,22 @@ function getSpeedoStreamExtraction(link) {
     server: "SpeedoStream",
     link: link,
     type: "http",
-    extraction: {
-      method: "GET",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Referer": "https://prmovies.delivery/"
-      },
-      patterns: [
-        "sources:\\s*\\[\\s*\\{\\s*file\\s*:\\s*[\"']([^\"']+\\.m3u8[^\"']*)",
-        "file\\s*:\\s*[\"']([^\"']+\\.m3u8[^\"']*)[\"']"
-      ],
-      videoHeaders: {
-        "Referer": "https://speedostream1.com/"
+    automation: JSON.stringify({
+      extraction: {
+        method: "GET",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Referer": "https://prmovies.delivery/"
+        },
+        patterns: [
+          "sources:\\s*\\[\\s*\\{\\s*file\\s*:\\s*[\"']([^\"']+\\.m3u8[^\"']*)",
+          "file\\s*:\\s*[\"']([^\"']+\\.m3u8[^\"']*)[\"']"
+        ],
+        videoHeaders: {
+          "Referer": "https://speedostream1.com/"
+        }
       }
-    }
+    })
   }];
 }
 
