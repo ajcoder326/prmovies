@@ -22,7 +22,7 @@ function getMetaData(link, providerContext) {
     // PRMovies PsyPlay theme uses specific selectors
     // Extract title from .mvic-desc h3 or og:title
     var title = "";
-    
+
     // Try simpler selector first
     var titleEl = $(".mvic-desc h3").first();
     if (titleEl.length > 0) {
@@ -184,32 +184,32 @@ function getMetaData(link, providerContext) {
       var anchor = downloadLinks.eq(s);
       var href = anchor.attr("href") || "";
       var linkText = anchor.text().trim();
-      
+
       // Skip invalid links
       if (!href || href === "#" || href.indexOf("javascript:") === 0) continue;
       if (href.indexOf("http") !== 0) continue;
-      
+
       // Skip social/sharing links
-      if (href.indexOf("facebook.") !== -1 || 
-          href.indexOf("twitter.") !== -1 ||
-          href.indexOf("telegram.") !== -1 ||
-          href.indexOf("instagram.") !== -1) continue;
+      if (href.indexOf("facebook.") !== -1 ||
+        href.indexOf("twitter.") !== -1 ||
+        href.indexOf("telegram.") !== -1 ||
+        href.indexOf("instagram.") !== -1) continue;
 
       // Check if it's a streaming link (speedostream, etc.)
-      if (href.indexOf("speedostream") !== -1 || 
-          href.indexOf("streamwish") !== -1 ||
-          href.indexOf("filelions") !== -1 ||
-          href.indexOf("streamtape") !== -1 ||
-          href.indexOf("doodstream") !== -1 ||
-          href.indexOf("mixdrop") !== -1) {
-        
+      if (href.indexOf("speedostream") !== -1 ||
+        href.indexOf("streamwish") !== -1 ||
+        href.indexOf("filelions") !== -1 ||
+        href.indexOf("streamtape") !== -1 ||
+        href.indexOf("doodstream") !== -1 ||
+        href.indexOf("mixdrop") !== -1) {
+
         // Try to extract quality from link text or sibling spans
         var quality = "";
         var qualityMatch = linkText.match(/(\d{3,4}p|HD|4K)/i);
         if (qualityMatch) {
           quality = qualityMatch[0].toUpperCase();
         }
-        
+
         // Check sibling spans for quality info (PRMovies structure)
         var qualitySpan = anchor.find(".lnk-dl").last();
         if (qualitySpan.length > 0) {
@@ -244,21 +244,48 @@ function getMetaData(link, providerContext) {
     }
 
     // Also check for iframe sources (embedded players)
-    var iframes = $("iframe[src]");
+    // PRMovies hides iframes in #content-embed container
+    var iframes = $("#content-embed iframe[src], iframe[src]");
+    console.log("Iframes found:", iframes.length);
     for (var f = 0; f < iframes.length; f++) {
       var iframeSrc = iframes.eq(f).attr("src") || "";
       if (iframeSrc.indexOf("speedostream") !== -1 ||
-          iframeSrc.indexOf("streamwish") !== -1 ||
-          iframeSrc.indexOf("filelions") !== -1) {
-        
+        iframeSrc.indexOf("streamwish") !== -1 ||
+        iframeSrc.indexOf("filelions") !== -1) {
+
         var iframeServer = "Embedded Player";
         if (iframeSrc.indexOf("speedostream") !== -1) iframeServer = "SpeedoStream";
-        
+        else if (iframeSrc.indexOf("streamwish") !== -1) iframeServer = "StreamWish";
+        else if (iframeSrc.indexOf("filelions") !== -1) iframeServer = "FileLions";
+
         directLinks.push({
           title: iframeServer,
           link: iframeSrc,
           type: "stream"
         });
+      }
+    }
+
+    // Also check for embed links in anchor tags (backup method)
+    var embedLinks = $("a[href*='speedostream'], a[href*='embed-']");
+    for (var e = 0; e < embedLinks.length; e++) {
+      var embedHref = embedLinks.eq(e).attr("href") || "";
+      if (embedHref.indexOf("speedostream") !== -1 && embedHref.indexOf("embed") !== -1) {
+        // Check if already added
+        var alreadyAdded = false;
+        for (var d = 0; d < directLinks.length; d++) {
+          if (directLinks[d].link === embedHref) {
+            alreadyAdded = true;
+            break;
+          }
+        }
+        if (!alreadyAdded) {
+          directLinks.push({
+            title: "SpeedoStream",
+            link: embedHref,
+            type: "stream"
+          });
+        }
       }
     }
 
@@ -275,7 +302,7 @@ function getMetaData(link, providerContext) {
       for (var dl = 0; dl < directLinks.length; dl++) {
         var dlink = directLinks[dl];
         var q = (dlink.quality || "").toUpperCase();
-        
+
         if (q.indexOf("1080") !== -1 || q.indexOf("HD") !== -1 || q.indexOf("4K") !== -1) {
           hdLinks.push(dlink);
         } else if (q.indexOf("720") !== -1 || q.indexOf("480") !== -1) {

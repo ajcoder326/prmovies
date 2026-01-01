@@ -18,237 +18,244 @@ var headers = {
  */
 function getStreams(link, type) {
   console.log("getStreams called with:", link);
-  
+
   // SpeedoStream - most common on PRMovies
   if (link.indexOf("speedostream") !== -1) {
     return getSpeedoStreamExtraction(link);
   }
-  
+
   // StreamWish
   if (link.indexOf("streamwish") !== -1 || link.indexOf("swdyu") !== -1) {
     return getStreamWishExtraction(link);
   }
-  
+
   // FileLions
   if (link.indexOf("filelions") !== -1 || link.indexOf("alions") !== -1) {
     return getFileLionsExtraction(link);
   }
-  
+
   // StreamTape
   if (link.indexOf("streamtape") !== -1 || link.indexOf("stape") !== -1) {
     return getStreamTapeExtraction(link);
   }
-  
+
   // DoodStream
   if (link.indexOf("doodstream") !== -1 || link.indexOf("dood.") !== -1) {
     return getDoodStreamExtraction(link);
   }
-  
+
   // MixDrop
   if (link.indexOf("mixdrop") !== -1) {
     return getMixDropExtraction(link);
   }
-  
+
   // Unknown - try generic video extraction
   console.log("Unknown link type, trying generic extraction");
   return getGenericVideoExtraction(link);
 }
 
 /**
- * SpeedoStream extraction
- * SpeedoStream embeds video URL in jwplayer.setup() JavaScript
- * Uses HTTP extraction instead of DOM automation to avoid popup ads
+ * SpeedoStream extraction - HTTP Scraping (like HDHub4u)
+ * 
+ * Flow (from RPA recording):
+ * 1. POST to page with form data {imhuman: ""}
+ * 2. Parse result for quality links (/d/{id}_x for UHD, /d/{id}_l for SD)
+ * 3. POST to quality page with form
+ * 4. Extract "Direct Download Link" (MP4 URL from ydc1wes.me)
  */
 function getSpeedoStreamExtraction(link) {
-  console.log("Creating SpeedoStream extraction:", link);
-  
-  return [{
-    server: "SpeedoStream",
-    link: link,
-    type: "http",
-    automation: {
-      extraction: {
-        method: "GET",
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          "Referer": "https://prmovies.delivery/"
-        },
-        patterns: [
-          "sources:\\s*\\[\\s*\\{\\s*file\\s*:\\s*[\"']([^\"']+\\.m3u8[^\"']*)",
-          "file\\s*:\\s*[\"']([^\"']+\\.m3u8[^\"']*)[\"']"
-        ],
-        videoHeaders: {
-          "Referer": "https://speedostream1.com/"
+  console.log("SpeedoStream HTTP extraction:", link);
+
+  try {
+    var speedoHeaders = {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      "Referer": "https://prmovies.delivery/",
+      "Accept": "text/html,application/xhtml+xml",
+      "Content-Type": "application/x-www-form-urlencoded"
+    };
+
+    // Step 1: POST to the page with imhuman form field
+    console.log("Step 1: POST to SpeedoStream page");
+    var response1 = axios.post(link, "imhuman=", { headers: speedoHeaders });
+    var html1 = response1.data;
+
+    // Parse for quality download links
+    var $ = cheerio.load(html1);
+    var streams = [];
+
+    // Look for download quality links like /d/{id}_x (UHD), /d/{id}_l (SD)
+    var qualityLinks = [];
+    $("a[href*='/d/']").each(function () {
+      var href = $(this).attr("href") || "";
+      var text = $(this).text().trim();
+      if (href.indexOf("/d/") !== -1) {
+        qualityLinks.push({
+          href: href,
+          text: text,
+          quality: text.toLowerCase().indexOf("uhd") !== -1 ? "UHD" :
+            text.toLowerCase().indexOf("low") !== -1 ? "SD" : "HD"
+        });
+      }
+    });
+
+    console.log("Quality links found:", qualityLinks.length);
+
+    // Also check for direct download links on the page
+    $("a[href*='ydc1wes.me'], a[href*='.mp4']").each(function () {
+      var href = $(this).attr("href") || "";
+      if (href.indexOf(".mp4") !== -1 || href.indexOf("ydc1wes.me") !== -1) {
+        streams.push({
+          server: "Direct Download",
+          link: href,
+          type: "direct",
+          quality: "HD",
+          headers: { "Referer": link }
+        });
+      }
+    });
+
+    // If we found direct links, return them
+    if (streams.length > 0) {
+      console.log("Found direct MP4 links:", streams.length);
+      return streams;
+    }
+
+    // Process quality links - try to get download URLs
+    for (var i = 0; i < qualityLinks.length && i < 3; i++) {
+      var qLink = qualityLinks[i];
+      var fullUrl = qLink.href;
+      if (fullUrl.indexOf("http") !== 0) {
+        // Make absolute URL
+        var baseMatch = link.match(/^(https?:\/\/[^\/]+)/);
+        if (baseMatch) {
+          fullUrl = baseMatch[1] + qLink.href;
         }
       }
+
+      console.log("Processing quality link:", qLink.quality, fullUrl);
+
+      try {
+        // POST to quality page
+        var response2 = axios.post(fullUrl, "imhuman=", { headers: speedoHeaders });
+        var html2 = response2.data;
+        var $2 = cheerio.load(html2);
+
+        // Look for Direct Download Link
+        $2("a[href*='ydc1wes.me'], a[href*='.mp4'], a:contains('Direct Download')").each(function () {
+          var dlHref = $2(this).attr("href") || "";
+          if (dlHref && (dlHref.indexOf(".mp4") !== -1 || dlHref.indexOf("ydc1wes.me") !== -1)) {
+            streams.push({
+              server: "SpeedoStream " + qLink.quality,
+              link: dlHref,
+              type: "direct",
+              quality: qLink.quality,
+              headers: { "Referer": fullUrl }
+            });
+          }
+        });
+      } catch (qErr) {
+        console.error("Quality page error:", qErr);
+      }
     }
-  }];
+
+    if (streams.length > 0) {
+      console.log("Extracted", streams.length, "streams");
+      return streams;
+    }
+
+    // Fallback: return original link for WebView playback
+    console.log("Fallback to embed URL");
+    var embedUrl = link.replace(/\/([^\/]+)\.html$/, "/embed-$1.html");
+    return [{
+      server: "SpeedoStream",
+      link: embedUrl,
+      type: "automate",
+      quality: "HD",
+      automation: { steps: [{ action: "waitForElement", selector: "video", timeout: 15000 }] }
+    }];
+
+  } catch (err) {
+    console.error("SpeedoStream extraction error:", err);
+    return [];
+  }
 }
 
 /**
- * StreamWish extraction
+ * StreamWish extraction - uses m3u8 interception for native playback
  */
 function getStreamWishExtraction(link) {
   console.log("Creating StreamWish extraction:", link);
-  
   return [{
     server: "StreamWish",
     link: link,
     type: "automate",
+    quality: "HD",
     automation: {
-      steps: [
-        {
-          action: "extractUrl",
-          selectors: [
-            "video source[src]",
-            "video[src]",
-            "source[src*='.m3u8']"
-          ],
-          attribute: "src",
-          patterns: [".m3u8", ".mp4"]
-        },
-        {
-          action: "extractFromScript",
-          patterns: [
-            "file:\\s*[\"']([^\"']+\\.m3u8[^\"']*)[\"']",
-            "sources:\\s*\\[\\{[^}]*file:[\"']([^\"']+)[\"']"
-          ]
-        }
-      ]
+      steps: [{ action: "waitForElement", selector: "video", timeout: 15000 }]
     }
   }];
 }
 
 /**
- * FileLions extraction
+ * FileLions extraction - uses m3u8 interception
  */
 function getFileLionsExtraction(link) {
   console.log("Creating FileLions extraction:", link);
-  
   return [{
     server: "FileLions",
     link: link,
     type: "automate",
+    quality: "HD",
     automation: {
-      steps: [
-        {
-          action: "extractUrl",
-          selectors: [
-            "video source[src]",
-            "video[src]"
-          ],
-          attribute: "src",
-          patterns: [".m3u8", ".mp4"]
-        },
-        {
-          action: "extractFromScript",
-          patterns: [
-            "file:\\s*[\"']([^\"']+\\.m3u8[^\"']*)[\"']",
-            "sources.*file:[\"']([^\"']+)[\"']"
-          ]
-        }
-      ]
+      steps: [{ action: "waitForElement", selector: "video", timeout: 15000 }]
     }
   }];
 }
 
 /**
- * StreamTape extraction
- * StreamTape uses a different mechanism with token-based URLs
+ * StreamTape extraction - uses m3u8 interception
  */
 function getStreamTapeExtraction(link) {
   console.log("Creating StreamTape extraction:", link);
-  
   return [{
     server: "StreamTape",
     link: link,
     type: "automate",
+    quality: "HD",
     automation: {
-      steps: [
-        {
-          action: "extractUrl",
-          selectors: [
-            "video#mainvideo source[src]",
-            "video source[src]",
-            "video[src]"
-          ],
-          attribute: "src",
-          patterns: [".mp4", "streamtape"]
-        },
-        {
-          action: "extractFromScript",
-          patterns: [
-            "getElementById\\(['\"]robotlink['\"]\\)\\.innerHTML\\s*=\\s*[\"']([^\"']+)[\"']",
-            "document\\.getElementById\\('robotlink'\\)\\.innerHTML\\s*\\+\\s*'([^']+)'"
-          ]
-        }
-      ]
+      steps: [{ action: "waitForElement", selector: "video", timeout: 15000 }]
     }
   }];
 }
 
 /**
- * DoodStream extraction
+ * DoodStream extraction - uses m3u8 interception
  */
 function getDoodStreamExtraction(link) {
   console.log("Creating DoodStream extraction:", link);
-  
   return [{
     server: "DoodStream",
     link: link,
     type: "automate",
+    quality: "HD",
     automation: {
-      steps: [
-        {
-          action: "extractUrl",
-          selectors: [
-            "video source[src]",
-            "video[src]"
-          ],
-          attribute: "src",
-          patterns: [".mp4", ".m3u8"]
-        },
-        {
-          action: "extractFromScript",
-          patterns: [
-            "dsplayer\\.hotkeys[^;]+source:\\s*[\"']([^\"']+)[\"']",
-            "\\.get\\([\"']([^\"']+/pass_md5/[^\"']+)[\"']"
-          ]
-        }
-      ]
+      steps: [{ action: "waitForElement", selector: "video", timeout: 15000 }]
     }
   }];
 }
 
 /**
- * MixDrop extraction
+ * MixDrop extraction - uses m3u8 interception
  */
 function getMixDropExtraction(link) {
   console.log("Creating MixDrop extraction:", link);
-  
   return [{
     server: "MixDrop",
     link: link,
     type: "automate",
+    quality: "HD",
     automation: {
-      steps: [
-        {
-          action: "extractUrl",
-          selectors: [
-            "video source[src]",
-            "video[src]"
-          ],
-          attribute: "src",
-          patterns: [".mp4", ".m3u8"]
-        },
-        {
-          action: "extractFromScript",
-          patterns: [
-            "MDCore\\.wurl\\s*=\\s*[\"']([^\"']+)[\"']",
-            "wurl\\s*=\\s*[\"']([^\"']+)[\"']"
-          ]
-        }
-      ]
+      steps: [{ action: "waitForElement", selector: "video", timeout: 15000 }]
     }
   }];
 }
@@ -258,7 +265,7 @@ function getMixDropExtraction(link) {
  */
 function getGenericVideoExtraction(link) {
   console.log("Creating generic video extraction:", link);
-  
+
   return [{
     server: "Video",
     link: link,
@@ -305,14 +312,14 @@ function tryDirectExtract(link) {
   try {
     var response = axios.get(link, { headers: headers, timeout: 10000 });
     var html = response.data;
-    
+
     // Look for m3u8 or mp4 URLs
     var patterns = [
       /file:\s*["']([^"']+\.m3u8[^"']*)['"]/i,
       /source:\s*["']([^"']+\.m3u8[^"']*)['"]/i,
       /file:\s*["']([^"']+\.mp4[^"']*)['"]/i
     ];
-    
+
     for (var i = 0; i < patterns.length; i++) {
       var match = html.match(patterns[i]);
       if (match && match[1]) {
@@ -327,6 +334,6 @@ function tryDirectExtract(link) {
   } catch (e) {
     console.error("Direct extract failed:", e);
   }
-  
+
   return null;
 }
