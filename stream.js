@@ -66,7 +66,7 @@ function getSpeedoStreamExtraction(link) {
     server: "SpeedoStream",
     link: link,
     type: "http",
-    automation: JSON.stringify({
+    automation: {
       extraction: {
         method: "GET",
         headers: {
@@ -81,7 +81,7 @@ function getSpeedoStreamExtraction(link) {
           "Referer": "https://speedostream1.com/"
         }
       }
-    })
+    }
   }];
 }
 
