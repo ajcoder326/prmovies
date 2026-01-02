@@ -181,24 +181,13 @@ function getSpeedoStreamExtraction(link) {
       return streams;
     }
 
-    // Fallback: Return navigate mode for native link selection with extraction rules
-    console.log("Fallback to Link Navigator");
+    // Fallback: Return browser mode for manual extraction
+    console.log("Fallback to Visible Browser");
     return [{
-      server: "SpeedoStream (Navigate)",
+      server: "SpeedoStream (Browser)",
       link: dUrl, // Use the /d/ URL
-      type: "navigate",
-      quality: "HD",
-      navigation: {
-        // Selectors for extracting links from pages
-        selectors: [
-          { type: "quality", selector: "#container table a", pattern: "quality|_x|_h|_l" },
-          { type: "download", selector: "form button[type=submit]", pattern: "download|file" },
-          { type: "direct", selector: "#container span a", pattern: "" },
-          { type: "video", selector: "a[href*='.mp4'], a[href*='.mkv'], a[href*='.m3u8']", pattern: "" }
-        ],
-        // Pattern to identify final video URL
-        videoPattern: "ydc1wes|\\.mp4|\\.mkv|\\.m3u8"
-      }
+      type: "browser",
+      quality: "HD"
     }];
 
   } catch (err) {
