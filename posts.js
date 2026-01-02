@@ -24,15 +24,24 @@ function getPosts(filter, page, providerContext) {
     }
     console.log("Fetching URL:", url);
 
-    var response = axios.get(url, { headers: headers });
-    console.log("Response received, data length:", response.data ? response.data.length : 0);
+    console.log("Fetching URL:", url);
 
-    if (!response.data) {
-      console.error("No response data");
+    var html = "";
+    if (typeof browser !== "undefined" && browser.get) {
+      console.log("Using WebView Browser for Cloudflare Bypass");
+      html = browser.get(url);
+    } else {
+      console.log("Using Axios (Legacy)");
+      var response = axios.get(url, { headers: headers });
+      html = response.data;
+    }
+
+    if (!html) {
+      console.error("No html data received");
       return [];
     }
 
-    var $ = cheerio.load(response.data);
+    var $ = cheerio.load(html);
     var posts = [];
 
     // PRMovies uses div.ml-item for movie cards
@@ -111,15 +120,22 @@ function getSearchPosts(query, page, providerContext) {
     var url = BASE_URL + "/page/" + page + "/?s=" + encodeURIComponent(query);
     console.log("Search URL:", url);
 
-    var response = axios.get(url, { headers: headers });
-    console.log("Search response received, data length:", response.data ? response.data.length : 0);
+    console.log("Search URL:", url);
 
-    if (!response.data) {
-      console.error("No search response data");
+    var html = "";
+    if (typeof browser !== "undefined" && browser.get) {
+      html = browser.get(url);
+    } else {
+      var response = axios.get(url, { headers: headers });
+      html = response.data;
+    }
+
+    if (!html) {
+      console.error("No search data received");
       return [];
     }
 
-    var $ = cheerio.load(response.data);
+    var $ = cheerio.load(html);
     var posts = [];
 
     // Search results use same ml-item structure
