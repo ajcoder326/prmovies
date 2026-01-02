@@ -55,13 +55,13 @@ function getStreams(link, type) {
 }
 
 /**
- * SpeedoStream extraction - HTTP Scraping (like HDHub4u)
+ * SpeedoStream Extraction - CORRECT FLOW (Based on user testing):
  * 
- * Flow (from RPA recording):
- * 1. POST to page with form data {imhuman: ""}
- * 2. Parse result for quality links (/d/{id}_x for UHD, /d/{id}_l for SD)
- * 3. POST to quality page with form
- * 4. Extract "Direct Download Link" (MP4 URL from ydc1wes.me)
+ * 1. Original URL: https://speedostream1.com/17fo1lpe9a7p.html
+ * 2. Convert to:   https://speedostream1.com/d/17fo1lpe9a7p.html (add /d/)
+ * 3. Page 2: Quality selection (UHD quality, Low quality) → /d/{id}_x or /d/{id}_l
+ * 4. Page 3: "Download File" button → POST with imhuman=
+ * 5. Page 4: "Direct Download Link" → Final MP4 URL
  */
 function getSpeedoStreamExtraction(link) {
   console.log("SpeedoStream extraction:", link);
@@ -70,37 +70,46 @@ function getSpeedoStreamExtraction(link) {
   if (typeof browser !== "undefined" && browser.get) {
     console.log("Warming up cookies for", link);
     browser.get(link);
-    // The result HTML might be the verification page or the form page.
-    // But purely calling this has set the Cookies in the App.
   }
 
-  console.log("Starting HTTP extraction...");
+  var speedoHeaders = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Referer": "https://prmovies.delivery/",
+    "Accept": "text/html,application/xhtml+xml",
+    "Content-Type": "application/x-www-form-urlencoded"
+  };
 
   try {
-    var speedoHeaders = {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      "Referer": "https://prmovies.delivery/",
-      "Accept": "text/html,application/xhtml+xml",
-      "Content-Type": "application/x-www-form-urlencoded"
-    };
+    // Step 1: Convert original URL to /d/ format
+    // https://speedostream1.com/17fo1lpe9a7p.html → https://speedostream1.com/d/17fo1lpe9a7p.html
+    var dUrl = link;
+    var baseMatch = link.match(/^(https?:\/\/[^\/]+)\/([\w]+)\.html/);
+    if (baseMatch) {
+      var baseUrl = baseMatch[1];
+      var fileId = baseMatch[2];
+      dUrl = baseUrl + "/d/" + fileId + ".html";
+      console.log("Converted to /d/ URL:", dUrl);
+    }
 
-    // Step 1: POST to the page with imhuman form field
-    console.log("Step 1: POST to SpeedoStream page");
-    var response1 = axios.post(link, "imhuman=", { headers: speedoHeaders });
-    var html1 = response1.data;
+    // Step 2: GET the /d/ page to see quality options
+    console.log("Step 2: GET quality selection page");
+    speedoHeaders["Referer"] = link;
+    var resp1 = axios.get(dUrl, { headers: speedoHeaders });
+    var html1 = resp1.data;
+    var $1 = cheerio.load(html1);
 
-    // Parse for quality download links
-    var $ = cheerio.load(html1);
-    var streams = [];
-
-    // Look for download quality links like /d/{id}_x (UHD), /d/{id}_l (SD)
+    // Find quality links (UHD quality → /d/{id}_x, Low quality → /d/{id}_l)
     var qualityLinks = [];
-    $("a[href*='/d/']").each(function () {
-      var href = $(this).attr("href") || "";
-      var text = $(this).text().trim();
-      if (href.indexOf("/d/") !== -1) {
+    $1("a[href*='/d/']").each(function () {
+      var href = $1(this).attr("href") || "";
+      var text = $1(this).text().trim();
+      if (href.indexOf("/d/") !== -1 && (href.indexOf("_x") !== -1 || href.indexOf("_l") !== -1 || href.indexOf("_h") !== -1)) {
+        var fullHref = href;
+        if (href.indexOf("http") !== 0) {
+          fullHref = baseMatch ? baseMatch[1] + href : href;
+        }
         qualityLinks.push({
-          href: href,
+          href: fullHref,
           text: text,
           quality: text.toLowerCase().indexOf("uhd") !== -1 ? "UHD" :
             text.toLowerCase().indexOf("low") !== -1 ? "SD" : "HD"
@@ -110,98 +119,87 @@ function getSpeedoStreamExtraction(link) {
 
     console.log("Quality links found:", qualityLinks.length);
 
-    // Also check for direct download links on the page
-    $("a[href*='ydc1wes.me'], a[href*='.mp4']").each(function () {
-      var href = $(this).attr("href") || "";
-      if (href.indexOf(".mp4") !== -1 || href.indexOf("ydc1wes.me") !== -1) {
-        streams.push({
-          server: "Direct Download",
-          link: href,
-          type: "direct",
-          quality: "HD",
-          headers: { "Referer": link }
-        });
-      }
-    });
+    var streams = [];
 
-    // If we found direct links, return them
-    if (streams.length > 0) {
-      console.log("Found direct MP4 links:", streams.length);
-      return streams;
-    }
-
-    // Process quality links - try to get download URLs
-    for (var i = 0; i < qualityLinks.length && i < 3; i++) {
+    // Step 3 & 4: For each quality, navigate through download flow
+    for (var i = 0; i < qualityLinks.length && i < 2; i++) {
       var qLink = qualityLinks[i];
-      var fullUrl = qLink.href;
-      if (fullUrl.indexOf("http") !== 0) {
-        // Make absolute URL
-        var baseMatch = link.match(/^(https?:\/\/[^\/]+)/);
-        if (baseMatch) {
-          fullUrl = baseMatch[1] + qLink.href;
-        }
-      }
-
-      console.log("Processing quality link:", qLink.quality, fullUrl);
+      console.log("Processing quality:", qLink.quality, qLink.href);
 
       try {
-        // Step 3: GET the /d/ page first (load it)
-        speedoHeaders["Referer"] = link;
-        console.log("GET /d/ page first");
-        var getResp = axios.get(fullUrl, { headers: speedoHeaders });
+        // Step 3: GET the quality page (shows "Download File" button)
+        speedoHeaders["Referer"] = dUrl;
+        var resp2 = axios.get(qLink.href, { headers: speedoHeaders });
+        var html2 = resp2.data;
 
-        // Step 4: POST to same page (submit "Download File" form)
-        speedoHeaders["Referer"] = fullUrl;
-        console.log("POST to /d/ page");
-        var response2 = axios.post(fullUrl, "imhuman=", { headers: speedoHeaders });
-        var html2 = response2.data;
-        var $2 = cheerio.load(html2);
+        // Step 4: POST to same page (click "Download File" button)
+        speedoHeaders["Referer"] = qLink.href;
+        console.log("Step 4: POST to get direct download page");
+        var resp3 = axios.post(qLink.href, "imhuman=", { headers: speedoHeaders });
+        var html3 = resp3.data;
+        var $3 = cheerio.load(html3);
 
-        // Step 5: Look for Direct Download Link
-        $2("a[href*='ydc1wes.me'], a[href*='.mp4'], a:contains('Direct Download')").each(function () {
-          var dlHref = $2(this).attr("href") || "";
-          if (dlHref && (dlHref.indexOf(".mp4") !== -1 || dlHref.indexOf("ydc1wes.me") !== -1)) {
+        // Step 5: Find "Direct Download Link"
+        $3("a").each(function () {
+          var href = $3(this).attr("href") || "";
+          var text = $3(this).text().trim();
+
+          if (href.indexOf(".mp4") !== -1 || href.indexOf(".mkv") !== -1 ||
+            href.indexOf("ydc1wes") !== -1 || text.indexOf("Direct Download") !== -1) {
+            console.log("Found direct link:", href.substring(0, 80));
             streams.push({
               server: "SpeedoStream " + qLink.quality,
-              link: dlHref,
+              link: href,
               type: "direct",
               quality: qLink.quality,
-              headers: { "Referer": fullUrl }
+              headers: { "Referer": qLink.href }
             });
-            console.log("Direct link found:", dlHref.substring(0, 80));
           }
         });
+
+        // Also check for links in specific patterns
+        $3("a[href*='ydc1wes'], a[href*='.mp4'], a[href*='.mkv']").each(function () {
+          var href = $3(this).attr("href") || "";
+          if (href && streams.filter(function (s) { return s.link === href; }).length === 0) {
+            streams.push({
+              server: "SpeedoStream " + qLink.quality,
+              link: href,
+              type: "direct",
+              quality: qLink.quality,
+              headers: { "Referer": qLink.href }
+            });
+          }
+        });
+
       } catch (qErr) {
         console.error("Quality page error:", qErr.message || qErr);
       }
     }
 
     if (streams.length > 0) {
-      console.log("Extracted", streams.length, "streams");
+      console.log("Extracted", streams.length, "direct streams");
       return streams;
     }
 
-    // Fallback: use WebView automation for direct page
-    // SpeedoStream embeds are disabled, so we use direct page with button click
+    // Fallback: Return automation for browser-based extraction
     console.log("Fallback to WebView automation");
     return [{
       server: "SpeedoStream",
-      link: link,
+      link: dUrl, // Use the /d/ URL for automation
       type: "automate",
       quality: "HD",
       automation: {
         blockedPatterns: [
-          // Gambling & Betting
           "4rabet", "mexc.com", "betting", "casino", "stske.net",
-          // Ad Networks
           "doubleclick", "googlesyndication", "adservice", "popads", "popcash",
-          "propellerads", "exoclick", "adcash",
-          // Social & Tracking
-          "facebook.com", "twitter.com", "analytics"
+          "propellerads", "exoclick", "adcash", "facebook.com", "twitter.com", "analytics"
         ],
         steps: [
-          // Click "Proceed to video" button
-          { action: "clickElement", selector: "#btn_download, input[name='imhuman']" }
+          { action: "clickElement", selector: "a[href*='_x'], a[href*='_l'], a:contains('UHD'), a:contains('quality')" },
+          { action: "wait", duration: 2000 },
+          { action: "clickElement", selector: "#btn_download, input[name='imhuman'], button:contains('Download')" },
+          { action: "wait", duration: 2000 },
+          { action: "clickElement", selector: "a:contains('Direct Download'), a[href*='.mp4'], a[href*='ydc1wes']" }
         ]
       }
     }];
