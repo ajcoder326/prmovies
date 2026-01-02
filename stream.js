@@ -64,7 +64,17 @@ function getStreams(link, type) {
  * 4. Extract "Direct Download Link" (MP4 URL from ydc1wes.me)
  */
 function getSpeedoStreamExtraction(link) {
-  console.log("SpeedoStream HTTP extraction:", link);
+  console.log("SpeedoStream extraction:", link);
+
+  // Warm up Cloudflare cookies via Interactive Solver / Overlay
+  if (typeof browser !== "undefined" && browser.get) {
+    console.log("Warming up cookies for", link);
+    browser.get(link);
+    // The result HTML might be the verification page or the form page.
+    // But purely calling this has set the Cookies in the App.
+  }
+
+  console.log("Starting HTTP extraction...");
 
   try {
     var speedoHeaders = {
