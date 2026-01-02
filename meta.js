@@ -14,6 +14,8 @@ function getMetaData(link, providerContext) {
     if (typeof browser !== "undefined" && browser.get) {
       console.log("Using WebView Browser for Meta");
       html = browser.get(link);
+      console.log("Meta HTML Length:", html.length);
+      console.log("Meta HTML Start:", html.substring(0, 500));
     } else {
       var response = axios.get(link, { headers: headers });
       html = response ? response.data : "";
