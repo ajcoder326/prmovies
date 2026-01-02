@@ -3,8 +3,8 @@
 var BASE_URL = "https://prmovies.delivery";
 
 var headers = {
-  "Referer": "https://google.com",
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+  "Referer": "https://prmovies.delivery/",
+  "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 };
 
 function getPosts(filter, page, providerContext) {
@@ -70,7 +70,7 @@ function getPosts(filter, page, providerContext) {
     if (posts.length === 0) {
       var articleItems = $("article.item");
       console.log("Fallback article items:", articleItems.length);
-      
+
       for (var j = 0; j < articleItems.length; j++) {
         try {
           var el = articleItems.eq(j);
