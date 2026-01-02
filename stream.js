@@ -181,12 +181,12 @@ function getSpeedoStreamExtraction(link) {
       return streams;
     }
 
-    // Fallback: Return browser mode for manual extraction
-    console.log("Fallback to Visible Browser");
+    // Fallback: Return navigate mode for native link selection
+    console.log("Fallback to Link Navigator");
     return [{
-      server: "SpeedoStream (Browser)",
+      server: "SpeedoStream (Navigate)",
       link: dUrl, // Use the /d/ URL
-      type: "browser",
+      type: "navigate",
       quality: "HD"
     }];
 
