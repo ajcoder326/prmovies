@@ -180,6 +180,15 @@ function getSpeedoStreamExtraction(link) {
       type: "automate",
       quality: "HD",
       automation: {
+        blockedPatterns: [
+          // Gambling & Betting
+          "4rabet", "mexc.com", "betting", "casino", "stske.net",
+          // Ad Networks
+          "doubleclick", "googlesyndication", "adservice", "popads", "popcash",
+          "propellerads", "exoclick", "adcash",
+          // Social & Tracking
+          "facebook.com", "twitter.com", "analytics"
+        ],
         steps: [
           // Click "Proceed to video" button
           { action: "clickElement", selector: "#btn_download, input[name='imhuman']" }
