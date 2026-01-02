@@ -30,6 +30,8 @@ function getPosts(filter, page, providerContext) {
     if (typeof browser !== "undefined" && browser.get) {
       console.log("Using WebView Browser for Cloudflare Bypass");
       html = browser.get(url);
+      console.log("HTML received via Browser. Length:", html.length);
+      console.log("HTML Start:", html.substring(0, 500));
     } else {
       console.log("Using Axios (Legacy)");
       var response = axios.get(url, { headers: headers });
