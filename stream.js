@@ -181,27 +181,13 @@ function getSpeedoStreamExtraction(link) {
       return streams;
     }
 
-    // Fallback: Return automation for browser-based extraction
-    console.log("Fallback to WebView automation");
+    // Fallback: Return browser mode for manual extraction
+    console.log("Fallback to Visible Browser");
     return [{
-      server: "SpeedoStream",
-      link: dUrl, // Use the /d/ URL for automation
-      type: "automate",
-      quality: "HD",
-      automation: {
-        blockedPatterns: [
-          "4rabet", "mexc.com", "betting", "casino", "stske.net",
-          "doubleclick", "googlesyndication", "adservice", "popads", "popcash",
-          "propellerads", "exoclick", "adcash", "facebook.com", "twitter.com", "analytics"
-        ],
-        steps: [
-          { action: "clickElement", selector: "a[href*='_x'], a[href*='_l'], a:contains('UHD'), a:contains('quality')" },
-          { action: "wait", duration: 2000 },
-          { action: "clickElement", selector: "#btn_download, input[name='imhuman'], button:contains('Download')" },
-          { action: "wait", duration: 2000 },
-          { action: "clickElement", selector: "a:contains('Direct Download'), a[href*='.mp4'], a[href*='ydc1wes']" }
-        ]
-      }
+      server: "SpeedoStream (Browser)",
+      link: dUrl, // Use the /d/ URL
+      type: "browser",
+      quality: "HD"
     }];
 
   } catch (err) {
