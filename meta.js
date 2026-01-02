@@ -10,14 +10,21 @@ function getMetaData(link, providerContext) {
   console.log("getMetaData called - link:", link);
 
   try {
-    var response = axios.get(link, { headers: headers });
+    var html = "";
+    if (typeof browser !== "undefined" && browser.get) {
+      console.log("Using WebView Browser for Meta");
+      html = browser.get(link);
+    } else {
+      var response = axios.get(link, { headers: headers });
+      html = response ? response.data : "";
+    }
 
-    if (!response || !response.data) {
-      console.error("No meta response data");
+    if (!html) {
+      console.error("No meta html data");
       return createEmptyMeta();
     }
 
-    var $ = cheerio.load(response.data);
+    var $ = cheerio.load(html);
 
     // PRMovies PsyPlay theme uses specific selectors
     // Extract title from .mvic-desc h3 or og:title
